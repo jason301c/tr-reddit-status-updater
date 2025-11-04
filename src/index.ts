@@ -73,24 +73,34 @@ async function runCheckCycle() {
           errorCount++;
         }
         
+        // Protect Live status from being downgraded to Not Found
+        // (could be a temporary proxy/network issue)
+        const currentStatus = record.fields['Post Status (Checker)'];
+        let finalStatus = result.status;
+        
+        if (currentStatus === 'Live' && result.status === 'Not Found') {
+          console.log(`  ℹ️ Preserving Live status (Not Found could be temporary)`);
+          finalStatus = 'Live';
+        }
+        
         // Display results with appropriate emoji
         let statusEmoji = '?';
-        if (result.status === 'Live') {
+        if (finalStatus === 'Live') {
           statusEmoji = '✓';
-        } else if (result.status === 'Removed') {
+        } else if (finalStatus === 'Removed') {
           statusEmoji = '✗';
-        } else if (result.status === 'Not Found') {
+        } else if (finalStatus === 'Not Found') {
           statusEmoji = '⚠';
         }
         
-        console.log(`  Status: ${statusEmoji} ${result.status}`);
+        console.log(`  Status: ${statusEmoji} ${finalStatus}`);
         console.log(`  Comments: ${result.commentCount}`);
         console.log(`  Collapsed: ${result.collapsedCount}`);
         
         // Update Airtable
         await updateRecordCheckerFields(
           record.id,
-          result.status,
+          finalStatus,
           result.commentCount,
           result.collapsedCount
         );
