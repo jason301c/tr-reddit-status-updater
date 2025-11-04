@@ -45,12 +45,52 @@ function countCollapsedComments(comments: any[]): number {
 }
 
 /**
+ * Resolve Reddit share links to actual post URLs
+ */
+async function resolveShareLink(postUrl: string): Promise<string> {
+  const urlObj = new URL(postUrl);
+  
+  // Check if it's a share link (contains /s/)
+  if (!urlObj.pathname.includes('/s/')) {
+    return postUrl;
+  }
+  
+  console.log(`  Detected share link, resolving...`);
+  
+  try {
+    const agent = createProxyAgent();
+    
+    // Make a HEAD request to follow the redirect
+    const response = await axios.head(postUrl, {
+      httpAgent: agent,
+      httpsAgent: agent,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      maxRedirects: 5,
+      timeout: 15000,
+    });
+    
+    // The final URL after redirects
+    const resolvedUrl = response.request.res.responseUrl || postUrl;
+    console.log(`  Resolved to: ${resolvedUrl}`);
+    return resolvedUrl;
+  } catch (error) {
+    console.log(`  ⚠ Could not resolve share link, trying original URL`);
+    return postUrl;
+  }
+}
+
+/**
  * Check a Reddit post using the JSON API
  */
 export async function checkRedditPost(postUrl: string): Promise<CheckResult> {
   try {
+    // First, resolve share links to actual post URLs
+    const resolvedUrl = await resolveShareLink(postUrl);
+    
     // Parse the URL and remove query parameters
-    const urlObj = new URL(postUrl);
+    const urlObj = new URL(resolvedUrl);
     const pathname = urlObj.pathname.replace(/\/$/, ''); // Remove trailing slash
     
     // Construct the JSON API URL
